@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KMeans Clustering Algorithm</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>KMeans Clustering Algorithm</h1>
+
+        <div class="controls">
+            <label for="clusters">Number of Clusters (k):</label>
+            <input type="number" id="clusters" value="6" min="1">
+            
+            <label for="method">Initialization Method:</label>
+            <select id="method">
+                <option value="random">Random</option>
+                <option value="k-means++">K-Means++</option>
+            </select>
+        </div>
+
+        <div class="buttons">
+            <button onclick="initialize()">Initialize</button>
+            <button onclick="step()">Step Through KMeans</button>
+            <button onclick="runConvergence()">Run to Convergence</button>
+            <button onclick="newData()">Generate New Dataset</button>
+            <button onclick="reset()">Reset Algorithm</button>
+        </div>
+
+        <div id="plot"></div>
+    </div>
+
+    <script>
+        let currentData = [];
+        let currentCentroids = [];
+        let isConverged = false;
+        let iteration = 0;
+
+        function initialize() {
+            const clusters = document.getElementById('clusters').value;
+            const method = document.getElementById('method').value;
+            fetch('/initialize', {
+                method: 'POST',
+                body: new URLSearchParams({ clusters, method })
+            }).then(response => response.json())
+              .then(data => {
+                  if(data.status) {
+                    alert("Initialized KMeans with " + clusters +
+                      " clusters and " + method + " initialization");
+                  }
+
+                  isConverged = false;
+                  iteration = 0;
+                  document.getElementById('plot').innerHTML = '';  // Clear plot
+              });
+        }
+
+        function step() {
+            if (isConverged) {
+                alert("KMeans has already converged!");
+                return;
+            }
+
+            fetch('/step', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+
+                currentData = data.data;
+                currentCentroids = data.centroids;
+                isConverged = data.converged;
+                iteration++;
+                updatePlot(data);
+
+                if (isConverged) {
+                    alert("KMeans has converged.");
+                }
+            });
+        }
+
+        function runConvergence() {
+            fetch('/converge', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+
+                currentData = data.data;
+                currentCentroids = data.centroids;
+                plotClusters(data);
+            });
+        }
+
+        function newData() {
+            fetch('/new_data', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+
+                currentData = data.data;
+                currentCentroids = data.centroids;
+                plotClusters(data);
+            });
+        }
+
+        function reset() {
+            document.getElementById('plot').innerHTML = ''; // Clear the plot area
+            isConverged = false;
+            iteration = 0;
+        }
+
+        function plotClusters(data) {
+            const labels = data.labels;
+            const centroids = data.centroids;
+
+            const traces = [];
+            const uniqueLabels = [...new Set(labels)];
+
+            // Plot each cluster with its corresponding color
+            uniqueLabels.forEach((label) => {
+                const clusterData = currentData.filter((_, i) => labels[i] === label);
+                const trace = {
+                    x: clusterData.map(d => d[0]),
+                    y: clusterData.map(d => d[1]),
+                    mode: 'markers',
+                    type: 'scatter',
+                    name: `Cluster ${label}`,
+                    marker: { size: 8 }
+                };
+                traces.push(trace);
+            });
+
+            // Plot centroids
+            const centroidTrace = {
+                x: centroids.map(d => d[0]),
+                y: centroids.map(d => d[1]),
+                mode: 'markers',
+                type: 'scatter',
+                name: 'Centroids',
+                marker: { color: 'red', size: 12, symbol: 'x' }
+            };
+            traces.push(centroidTrace);
+
+            const layout = {
+                title: 'KMeans Clustering',
+                xaxis: { title: 'X-axis', zeroline: false },
+                yaxis: { title: 'Y-axis', zeroline: false },
+                showlegend: true,
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                font: {
+                    family: 'Arial, sans-serif',
+                    size: 16,
+                    color: '#333'
+                }
+            };
+
+            Plotly.newPlot('plot', traces, layout, {responsive: true});
+        }
+
+        // Function to animate the plot when stepping through iterations
+        function updatePlot(data) {
+          const labels = data.labels;
+          const centroids = data.centroids;
+
+          const traces = [];
+          const uniqueLabels = [...new Set(labels)];
+
+          // Create traces for each cluster - we plot them only once
+          if (iteration === 1) {
+              uniqueLabels.forEach((label) => {
+                  const clusterData = currentData.filter((_, i) => labels[i] === label);
+                  traces.push({
+                      x: clusterData.map(d => d[0]),
+                      y: clusterData.map(d => d[1]),
+                      mode: 'markers',
+                      type: 'scatter',
+                      name: `Cluster ${label}`,
+                      marker: { size: 8 }
+                  });
+              });
+
+              // Initial plot of centroids
+              traces.push({
+                  x: centroids.map(d => d[0]),
+                  y: centroids.map(d => d[1]),
+                  mode: 'markers',
+                  type: 'scatter',
+                  name: 'Centroids',
+                  marker: { color: 'red', size: 12, symbol: 'x' }
+              });
+
+              // First iteration - create the plot
+              const layout = {
+                  title: `KMeans Clustering: Iteration ${iteration}`,
+                  xaxis: { title: 'X-axis', zeroline: false },
+                  yaxis: { title: 'Y-axis', zeroline: false },
+                  showlegend: true,
+                  paper_bgcolor: 'rgba(0,0,0,0)',
+                  plot_bgcolor: 'rgba(0,0,0,0)',
+                  font: {
+                      family: 'Arial, sans-serif',
+                      size: 16,
+                      color: '#333'
+                  }
+              };
+
+              Plotly.newPlot('plot', traces, layout, {responsive: true});
+          } else {
+              // For subsequent iterations, animate only the centroids
+            const centroidX = centroids.map(d => d[0]);
+            const centroidY = centroids.map(d => d[1]);
+
+            // Use restyle to update only the centroid trace (last trace in the plot)
+            Plotly.restyle('plot', {
+                x: [centroidX],
+                y: [centroidY]
+            }, [uniqueLabels.length]);  // The index of the centroid trace
+
+            // Update layout to reflect the new iteration count
+            Plotly.relayout('plot', {
+                title: `KMeans Clustering: Iteration ${iteration}`
+            });
+        }
+      }
+    </script>
+</body>
+</html>
