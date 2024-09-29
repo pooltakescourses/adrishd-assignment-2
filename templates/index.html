@@ -123,6 +123,9 @@
             document.getElementById('plot').innerHTML = ''; // Clear the plot area
             isConverged = false;
             iteration = 0;
+            currentCentroids = [];
+            currentLabels = [];
+            currentData = [];
         }
 
         function plotClusters(data) {
