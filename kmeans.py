@@ -20,6 +20,18 @@ class KMeansClustering:
     def calculate_mean(self, points):
         return np.mean(points, axis=0)
 
+
+    # Farthest First Initialization
+    def farthest_first_init(self):
+        centroids = [random.choice(self.data)]  # Randomly pick the first centroid
+
+        while len(centroids) < self.n_clusters:
+            distances = [min(self.euclidean_distance(point, centroid) for centroid in centroids) for point in self.data]
+            farthest_point_idx = np.argmax(distances)
+            centroids.append(self.data[farthest_point_idx])
+
+        self.centroids = np.array(centroids)
+
     # KMeans++ initialization
     def kmeans_plus_plus_init(self):
         centroids = []
@@ -47,6 +59,11 @@ class KMeansClustering:
     # Random initialization
     def random_init(self):
         self.centroids = np.array(random.sample(self.data.tolist(), self.n_clusters))
+    
+    def manual_init(self, manual_centroids):
+        if len(manual_centroids) != self.n_clusters:
+            raise ValueError(f"Must provide exactly {self.n_clusters} initial centroids.")
+        self.centroids = np.array(manual_centroids)
 
     # Initialize centroids based on the chosen method
     def initialize_centroids(self):
@@ -54,6 +71,10 @@ class KMeansClustering:
             self.kmeans_plus_plus_init()
         elif self.init_method == 'random':
             self.random_init()
+        elif self.init_method == "farthest_first":
+            self.farthest_first_init()
+        elif self.init_method == "manual":
+            pass
         else:
           raise NotImplementedError(f"{self.init_method} initialization not implemented")
 

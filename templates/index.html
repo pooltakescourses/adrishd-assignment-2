@@ -19,6 +19,8 @@
             <select id="method">
                 <option value="random">Random</option>
                 <option value="k-means++">K-Means++</option>
+                <option value="farthest_first">Farthest First </option>
+                <option value="manual">Manual</option>
             </select>
         </div>
 
@@ -36,6 +38,8 @@
     <script>
         let currentData = [];
         let currentCentroids = [];
+        let currentLabels = [];
+        let manualCentroids = [];
         let isConverged = false;
         let iteration = 0;
 
@@ -110,6 +114,7 @@
 
                 currentData = data.data;
                 currentCentroids = data.centroids;
+                currentLabels = data.labels;
                 plotClusters(data);
             });
         }
@@ -123,6 +128,7 @@
         function plotClusters(data) {
             const labels = data.labels;
             const centroids = data.centroids;
+            const n_clusters = parseInt(document.getElementById('clusters').value);
 
             const traces = [];
             const uniqueLabels = [...new Set(labels)];
@@ -167,10 +173,48 @@
             };
 
             Plotly.newPlot('plot', traces, layout, {responsive: true});
+            const plotDiv = document.getElementById('plot');
+
+            plotDiv.on('plotly_click', function(data) {
+                const point = data.points[0];
+                const coordinates = [point.x, point.y];
+                if (manualCentroids.length < n_clusters) {
+                    manualCentroids.push(coordinates);  // Add selected centroid
+                    // Optionally, re-plot centroids on the graph
+                    currentCentroids = manualCentroids;
+                    plotData = {
+                      labels:currentLabels,
+                      centroids:currentCentroids,
+                      data: currentData
+                    }; 
+                    updatePlot(plotData);
+
+                }
+                if (manualCentroids.length === n_clusters) {
+                    // Here, you can make an AJAX call to the backend to start KMeans with these centroids
+                  fetch('/manual',
+                    {
+                      method: 'POST',
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify(manualCentroids)
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                      if(data.error){
+                        alert(data.error);
+                      }
+                      else if (data.message) {
+                        alert(data.message);
+                      }
+                    });
+                  manualCentroids = [];
+                }
+            });
         }
 
         // Function to animate the plot when stepping through iterations
         function updatePlot(data) {
+
           const labels = data.labels;
           const centroids = data.centroids;
 

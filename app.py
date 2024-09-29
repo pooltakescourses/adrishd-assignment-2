@@ -1,9 +1,10 @@
 from flask import Flask, render_template, request, jsonify
 from kmeans import KMeansClustering
+import numpy as np
 
 app = Flask(__name__)
 kmeans = None
-
+method = None
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -11,7 +12,7 @@ def index():
 
 @app.route('/initialize', methods=['POST'])
 def initialize():
-    global kmeans
+    global kmeans, method
     clusters = int(request.form['clusters'])
     method = request.form['method']
     kmeans = KMeansClustering(clusters, method)
@@ -32,6 +33,15 @@ def step():
             'converged': converged  # Return if it's converged
         })
     return jsonify({'error': 'KMeans not initialized'}), 400
+
+
+@app.route('/manual', methods=['POST'])
+def manual_init():
+  global kmeans, method
+  if kmeans and method == "manual":
+    kmeans.manual_init(request.json);
+    return jsonify({'message': 'Centroids Manually Initialized'}), 200
+  return jsonify({'error': 'kmeans not initialized'}), 400
 
 @app.route('/converge', methods=['POST'])
 def converge():
